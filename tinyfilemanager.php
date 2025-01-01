@@ -271,6 +271,7 @@ $root_url = fm_clean_path($root_url);
 // abs path for site
 defined('FM_ROOT_URL') || define('FM_ROOT_URL', ($is_https ? 'https' : 'http') . '://' . $http_host . (!empty($root_url) ? '/' . $root_url : ''));
 defined('FM_SELF_URL') || define('FM_SELF_URL', ($is_https ? 'https' : 'http') . '://' . $http_host . $_SERVER['PHP_SELF']);
+defined('FM_ALLOW_FS_LINKS') || define('FM_ALLOW_FS_LINKS', true);
 
 // logout
 if (isset($_GET['logout'])) {
@@ -904,10 +905,20 @@ if (isset($_POST['rename_from'], $_POST['rename_to'], $_POST['token']) && !FM_RE
 }
 
 // Download
-if (isset($_GET['dl'], $_POST['token'])) {
+if (isset($_GET['dl'], $_POST['token']) || isset($_GET['dl'], $_GET['tokenHash'])) {
     // Verify the token to ensure it's valid
-    if (!verifyToken($_POST['token'])) {
-        fm_set_msg("Invalid Token.", 'error');
+    if (isset($_POST['token'])) {
+        if (!verifyToken($_POST['token'])) {
+            fm_set_msg("Invalid Token.", 'error');
+            exit;
+        }
+    } elseif (isset($_GET['tokenHash'])) {
+        if (hash('sha256', $_SESSION['token']) != $_GET['tokenHash']) {
+            fm_set_msg("Invalid Token.", 'error');
+            exit;
+        }
+    } else {
+        fm_set_msg('Big logic error', 'error');
         exit;
     }
 
@@ -1721,7 +1732,11 @@ if (isset($_GET['view'])) {
     fm_show_header(); // HEADER
     fm_show_nav_path(FM_PATH); // current path
 
-    $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    if (FM_ALLOW_FS_LINKS == true) {
+        $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    } else {
+        $file_url = FM_SELF_URL . '?p=' . FM_PATH . '&dl=' . $file . '&tokenHash=' . hash('sha256', $_SESSION['token']);
+    }
     $file_path = $path . '/' . $file;
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
@@ -1816,7 +1831,9 @@ if (isset($_GET['view'])) {
                 <?php if (!FM_READONLY): ?>
                     <a class="fw-bold btn btn-outline-primary" title="<?php echo lng('Delete') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;del=<?php echo urlencode($file) ?>" onclick="confirmDailog(event, 1209, '<?php echo lng('Delete') . ' ' . lng('File'); ?>','<?php echo urlencode($file); ?>', this.href);"> <i class="fa fa-trash"></i> Delete</a>
                 <?php endif; ?>
-                <a class="fw-bold btn btn-outline-primary" href="<?php echo fm_enc($file_url) ?>" target="_blank"><i class="fa fa-external-link-square"></i> <?php echo lng('Open') ?></a></b>
+                <?php if (FM_ALLOW_FS_LINKS): ?>
+                  <a class="fw-bold btn btn-outline-primary" href="<?php echo fm_enc($file_url) ?>" target="_blank"><i class="fa fa-external-link-square"></i> <?php echo lng('Open') ?></a></b>
+                <?php endif; ?>
                 <?php
                 // ZIP actions
                 if (!FM_READONLY && ($is_zip || $is_gzip) && $filenames !== false) {
@@ -1927,7 +1944,11 @@ if (isset($_GET['edit']) && !FM_READONLY) {
     fm_show_header(); // HEADER
     fm_show_nav_path(FM_PATH); // current path
 
-    $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    if (FM_ALLOW_FS_LINKS == true) {
+        $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    } else {
+        $file_url = FM_SELF_URL . '?p=' . FM_PATH . '&dl=' . $file . '&tokenHash=' . hash('sha256', $_SESSION['token']);
+    }
     $file_path = $path . '/' . $file;
 
     // normal editer
@@ -2031,7 +2052,11 @@ if (isset($_GET['chmod']) && !FM_READONLY && !FM_IS_WIN) {
     fm_show_header(); // HEADER
     fm_show_nav_path(FM_PATH); // current path
 
-    $file_url = FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file;
+    if (FM_ALLOW_FS_LINKS == true) {
+        $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    } else {
+        $file_url = FM_SELF_URL . '?p=' . FM_PATH . '&dl=' . $file . '&tokenHash=' . hash('sha256', $_SESSION['token']);
+    }
     $file_path = $path . '/' . $file;
 
     $mode = fileperms($path . '/' . $file);
@@ -2199,7 +2224,9 @@ $all_files_size = 0;
                             <a title="<?php echo lng('Rename') ?>" href="#" onclick="rename('<?php echo fm_enc(addslashes(FM_PATH)) ?>', '<?php echo fm_enc(addslashes($f)) ?>');return false;"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></a>
                             <a title="<?php echo lng('CopyTo') ?>..." href="?p=&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o" aria-hidden="true"></i></a>
                         <?php endif; ?>
-                        <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f . '/') ?>" target="_blank"><i class="fa fa-link" aria-hidden="true"></i></a>
+                        <?php if (FM_ALLOW_FS_LINKS): ?>
+                          <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f . '/') ?>" target="_blank"><i class="fa fa-link" aria-hidden="true"></i></a>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php
@@ -2244,8 +2271,13 @@ $all_files_size = 0;
                         <div class="filename">
                             <?php
                             if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
-                                <?php $imagePreview = fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f); ?>
-                                <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
+                                <?php  ?>
+                                <a href="<?php echo $filelink ?>"
+                                   <?php if (FM_ALLOW_FS_LINKS == true) {
+                                     $imagePreview = fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f);
+                                     echo 'data-preview-image="' . $imagePreview . '"';
+                                   } ?>
+                                   title="<?php echo fm_enc($f) ?>">
                                 <?php else: ?>
                                     <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
                                     <?php endif; ?>
@@ -2270,7 +2302,9 @@ $all_files_size = 0;
                             <a title="<?php echo lng('CopyTo') ?>..."
                                 href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $f, '/')) ?>"><i class="fa fa-files-o"></i></a>
                         <?php endif; ?>
-                        <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank"><i class="fa fa-link"></i></a>
+                        <?php if (FM_ALLOW_FS_LINKS): ?>
+                          <a title="<?php echo lng('DirectLink') ?>" href="<?php echo fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f) ?>" target="_blank"><i class="fa fa-link"></i></a>
+                        <?php endif; ?>
                         <a title="<?php echo lng('Download') ?>" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;dl=<?php echo urlencode($f) ?>" onclick="confirmDailog(event, 1211, '<?php echo lng('Download'); ?>','<?php echo urlencode($f); ?>', this.href);"><i class="fa fa-download"></i></a>
                     </td>
                 </tr>

@@ -1751,6 +1751,7 @@ if (isset($_GET['view'])) {
     $is_video = false;
     $is_text = false;
     $is_onlineViewer = false;
+    $is_embedded_pdf = false;
 
     $view_title = 'File';
     $filenames = false; // for zip
@@ -1759,6 +1760,8 @@ if (isset($_GET['view'])) {
 
     if ($online_viewer && $online_viewer !== 'false' && in_array($ext, fm_get_onlineViewer_exts())) {
         $is_onlineViewer = true;
+    } elseif ($ext == 'pdf') {
+        $is_embedded_pdf = true;
     } elseif ($ext == 'zip' || $ext == 'tar') {
         $is_zip = true;
         $view_title = 'Archive';
@@ -1871,6 +1874,8 @@ if (isset($_GET['view'])) {
                     } else if ($online_viewer == 'microsoft') {
                         echo '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
                     }
+                } elseif ($is_embedded_pdf) {
+                    echo '<embed src="' . fm_enc($file_url) . '" style="border: none;">';
                 } elseif ($is_zip) {
                     // ZIP content
                     if ($filenames !== false) {

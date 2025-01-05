@@ -1875,7 +1875,7 @@ if (isset($_GET['view'])) {
                         echo '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=' . fm_enc($file_url) . '" frameborder="no" style="width:100%;min-height:460px"></iframe>';
                     }
                 } elseif ($is_embedded_pdf) {
-                    echo '<embed src="' . fm_enc($file_url) . '" style="border: none;">';
+                    echo '<embed src="' . fm_enc($file_url) . '" style="border: none; width: 100vw; height: 95vh">';
                 } elseif ($is_zip) {
                     // ZIP content
                     if ($filenames !== false) {
